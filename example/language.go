@@ -15,6 +15,7 @@ type Language struct {
 	AuthorID uint
 	Author   Person
 
+	// TODO: support array
 	Keywords []*Keyword
 
 	Teachers []Teacher
