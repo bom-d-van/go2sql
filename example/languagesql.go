@@ -6,6 +6,8 @@ import (
 	"log"
 	"strconv"
 	"strings"
+
+	"github.com/bom-d-van/go2sql/go2sql"
 )
 
 const (
@@ -16,80 +18,65 @@ const (
 	LanguageColumnWordsCount = "words_count"
 )
 
-// TODO: use FindLanguageSQL
-func FindLanguage(db *sql.DB) (l *Language, err error) {
-	return FindLanguageSQL(db, "")
-}
-
-func FindLanguageSQL(db *sql.DB, sql string) (l *Language, err error) {
-	l = &Language{}
-	err = db.QueryRow("select id, name, words_count from languages "+sql).Scan(&l.ID, &l.Name, &l.WordsCount)
-	return
-}
-
-func FindLanguages(db *sql.DB) (ls []*Language, err error) {
-	return FindLanguagesSQL(db, "")
-}
-
-func FindLanguagesSQL(db *sql.DB, sql string) (ls []*Language, err error) {
-	rows, err := db.Query("select * from languages " + sql)
-	if err != nil {
-		return
-	}
-
-	defer func() {
-		if er := rows.Close(); er != nil {
-			if err != nil {
-				log.Println(er)
-			} else {
-				err = er
-			}
-		}
-	}()
-
-	for rows.Next() {
-		var l Language
-		err = rows.Scan(&l.ID, &l.Name, &l.WordsCount)
-		if err != nil {
-			return
-		}
-		ls = append(ls, &l)
-	}
-
-	return
-}
-
-// TODO: use SelectLanguageSQL
-func SelectLanguage(db *sql.DB, columns []string) (l *Language, err error) {
-	return SelectLanguageSQL(db, columns, "")
-}
-
-func SelectLanguageSQL(db *sql.DB, columns []string, sql string) (l *Language, err error) {
+func FindLanguage(db *sql.DB, opts ...go2sql.QueryOption) (l *Language, err error) {
 	l = &Language{}
 	var fields []interface{}
-	for _, c := range columns {
-		switch c {
-		case LanguageColumnID:
-			fields = append(fields, &l.ID)
-		case LanguageColumnName:
-			fields = append(fields, &l.Name)
-		case LanguageColumnWordsCount:
-			fields = append(fields, &l.WordsCount)
-		default:
-			err = fmt.Errorf("go2sql: unknown column %s", c)
-			return
+	var columns []string
+	if sel, ok := go2sql.GetSelectQueryOption(opts); ok {
+		columns = []string(sel)
+		for _, c := range columns {
+			switch c {
+			case LanguageColumnID:
+				fields = append(fields, &l.ID)
+			case LanguageColumnName:
+				fields = append(fields, &l.Name)
+			case LanguageColumnWordsCount:
+				fields = append(fields, &l.WordsCount)
+			default:
+				err = fmt.Errorf("go2sql: unknown column %s", c)
+				return
+			}
+		}
+	} else {
+		columns = []string{"id", "name", "words_count"}
+		fields = []interface{}{&l.ID, &l.Name, &l.WordsCount}
+	}
+
+	var query go2sql.SQLQuery
+	if q, ok := go2sql.GetFullSQLQueryOption(opts); ok {
+		query = go2sql.SQLQuery(q)
+	} else {
+		query.Query = "select " + strings.Join(columns, ",") + " from languages"
+		if q, ok := go2sql.GetPartialSQLQueryOption(opts); ok {
+			query.Query += " " + q.Query
+			query.Args = q.Args
 		}
 	}
-	err = db.QueryRow("select " + strings.Join(columns, ",") + " from languages " + sql).Scan(fields...)
+
+	err = db.QueryRow(query.Query, query.Args...).Scan(fields...)
 	return
 }
 
-func SelectLanguages(db *sql.DB, columns []string) (ls []*Language, err error) {
-	return SelectLanguagesSQL(db, columns, "")
-}
+func FindLanguages(db *sql.DB, opts ...go2sql.QueryOption) (ls []*Language, err error) {
+	var columns []string
+	if sel, ok := go2sql.GetSelectQueryOption(opts); ok {
+		columns = []string(sel)
+	} else {
+		columns = []string{"id", "name", "words_count"}
+	}
 
-func SelectLanguagesSQL(db *sql.DB, columns []string, sql string) (ls []*Language, err error) {
-	rows, err := db.Query("select " + strings.Join(columns, ",") + " from languages " + sql)
+	var query go2sql.SQLQuery
+	if q, ok := go2sql.GetFullSQLQueryOption(opts); ok {
+		query = go2sql.SQLQuery(q)
+	} else {
+		query.Query = "select " + strings.Join(columns, ",") + " from languages"
+		if q, ok := go2sql.GetPartialSQLQueryOption(opts); ok {
+			query.Query += " " + q.Query
+			query.Args = q.Args
+		}
+	}
+
+	rows, err := db.Query(query.Query, query.Args...)
 	if err != nil {
 		return
 	}
@@ -145,8 +132,8 @@ func (l *Language) IsEmptyRow() bool {
 		len(l.Teachers) == 0
 }
 
-func (l *Language) Insert(db *sql.DB) (r sql.Result, err error) {
-	if !l.Author.IsEmptyRow() {
+func (l *Language) Insert(db *sql.DB, opts ...go2sql.InsertOption) (r sql.Result, err error) {
+	if !l.Author.IsEmptyRow() && go2sql.HasInsertOption(opts, go2sql.InsertOptionDeep) {
 		if _, err = l.Author.Insert(db); err != nil {
 			return
 		}
@@ -165,7 +152,7 @@ func (l *Language) Insert(db *sql.DB) (r sql.Result, err error) {
 	}
 	l.ID = uint(id)
 
-	if len(l.Keywords) > 0 {
+	if len(l.Keywords) > 0 && go2sql.HasInsertOption(opts, go2sql.InsertOptionDeep) {
 		for i, k := range l.Keywords {
 			l.Keywords[i].LanguageID = l.ID
 			if k.ID > 0 {
@@ -178,7 +165,7 @@ func (l *Language) Insert(db *sql.DB) (r sql.Result, err error) {
 		}
 	}
 
-	if len(l.Teachers) > 0 {
+	if len(l.Teachers) > 0 && go2sql.HasInsertOption(opts, go2sql.InsertOptionDeep) {
 		for i, t := range l.Teachers {
 			if t.ID <= 0 {
 				if _, err = l.Teachers[i].Insert(db); err != nil {
@@ -195,8 +182,8 @@ func (l *Language) Insert(db *sql.DB) (r sql.Result, err error) {
 }
 
 // TODO: deep update
-func (l *Language) Update(db *sql.DB) (r sql.Result, err error) {
-	if !l.Author.IsEmptyRow() {
+func (l *Language) Update(db *sql.DB, opts ...go2sql.UpdateOption) (r sql.Result, err error) {
+	if !l.Author.IsEmptyRow() && go2sql.HasUpdateOption(opts, go2sql.UpdateOptionDeep) {
 		if _, err = l.Author.Update(db); err != nil {
 			return
 		}
@@ -204,15 +191,15 @@ func (l *Language) Update(db *sql.DB) (r sql.Result, err error) {
 	}
 
 	if l.ID == 0 {
-		return l.Insert(db)
+		r, err = l.Insert(db)
+	} else {
+		r, err = db.Exec(`UPDATE languages SET name = ?, words_count = ? WHERE id = ?`, l.Name, l.WordsCount, l.ID)
 	}
-
-	r, err = db.Exec(`UPDATE languages SET name = ?, words_count = ? WHERE id = ?`, l.Name, l.WordsCount, l.ID)
 	if err != nil {
 		return
 	}
 
-	if len(l.Keywords) > 0 {
+	if len(l.Keywords) > 0 && go2sql.HasUpdateOption(opts, go2sql.UpdateOptionDeep) {
 		for i := range l.Keywords {
 			if _, err = l.Keywords[i].Update(db); err != nil {
 				return
@@ -220,7 +207,7 @@ func (l *Language) Update(db *sql.DB) (r sql.Result, err error) {
 		}
 	}
 
-	if len(l.Teachers) > 0 {
+	if len(l.Teachers) > 0 && go2sql.HasUpdateOption(opts, go2sql.UpdateOptionDeep) {
 		for i := range l.Teachers {
 			if _, err = l.Teachers[i].Update(db); err != nil {
 				return
@@ -258,35 +245,40 @@ func (l *Language) UpdateColumns(db *sql.DB, columns []string) (r sql.Result, er
 }
 
 // TODO: deep delete
-func (l *Language) Delete(db *sql.DB) (r sql.Result, err error) {
+func (l *Language) Delete(db *sql.DB, opts ...go2sql.DeleteOption) (r sql.Result, err error) {
+	if l == nil || l.IsEmptyRow() {
+		return
+	}
+
+	if go2sql.HasDeleteOption(opts, go2sql.DeleteOptionDeep) {
+		if _, err = l.Author.Delete(db); err != nil {
+			return
+		}
+
+		if len(l.Keywords) > 0 {
+			for i := range l.Keywords {
+				if _, err = l.Keywords[i].Delete(db); err != nil {
+					return
+				}
+			}
+		}
+
+		if len(l.Teachers) > 0 {
+			for i := range l.Teachers {
+				if _, err = l.Teachers[i].Delete(db); err != nil {
+					return
+				}
+			}
+		}
+	}
+
 	r, err = db.Exec(`DELETE FROM languages WHERE id = ?`, l.ID)
+
 	return
 }
 
 func (l *Language) LoadKeywords(db *sql.DB) (err error) {
-	rows, err := db.Query(`select id, name, type, language_id from keywords where language_id = ?`, l.ID)
-	if err != nil {
-		return
-	}
-
-	defer func() {
-		if er := rows.Close(); er != nil {
-			if err != nil {
-				log.Println(er)
-			} else {
-				err = er
-			}
-		}
-	}()
-
-	// l.Keywords = []Keyword{}
-	for rows.Next() {
-		var k Keyword
-		if err = rows.Scan(&k.ID, &k.Name, &k.Type, &k.LanguageID); err != nil {
-			return
-		}
-		l.Keywords = append(l.Keywords, k)
-	}
+	l.Keywords, err = FindKeywords(db, go2sql.PartialSQLQueryOption{Query: "where language_id = ?", Args: []interface{}{l.ID}})
 
 	return
 }
@@ -323,7 +315,7 @@ func LoadLanguagesKeywords(db *sql.DB, ls []*Language) (err error) {
 	for i, l := range ls {
 		for _, k := range keywords {
 			if k.LanguageID == l.ID {
-				ls[i].Keywords = append(ls[i].Keywords, k)
+				ls[i].Keywords = append(ls[i].Keywords, &k)
 			}
 		}
 	}

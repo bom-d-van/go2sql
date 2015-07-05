@@ -15,7 +15,7 @@ type Language struct {
 	AuthorID uint
 	Author   Person
 
-	Keywords []Keyword
+	Keywords []*Keyword
 
 	Teachers []Teacher
 	// LanguagesTeachers []LanguageTeacher

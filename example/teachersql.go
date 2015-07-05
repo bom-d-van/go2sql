@@ -16,9 +16,8 @@ func (t *Teacher) Insert(db *sql.DB) (r sql.Result, err error) {
 	return
 }
 
-func (t *Teacher) Update(db *sql.DB) (r sql.Result, err error) {
-	return
-}
+func (t *Teacher) Update(db *sql.DB) (r sql.Result, err error) { return }
+func (t *Teacher) Delete(db *sql.DB) (r sql.Result, err error) { return }
 
 func (t *Teacher) IsEmptyRow() bool {
 	empty := Teacher{}

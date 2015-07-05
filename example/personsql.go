@@ -16,9 +16,8 @@ func (p *Person) Insert(db *sql.DB) (r sql.Result, err error) {
 	return
 }
 
-func (p *Person) Update(db *sql.DB) (r sql.Result, err error) {
-	return
-}
+func (p *Person) Update(db *sql.DB) (r sql.Result, err error) { return }
+func (p *Person) Delete(db *sql.DB) (r sql.Result, err error) { return }
 
 func (l *Person) IsEmptyRow() bool {
 	empty := Person{}
