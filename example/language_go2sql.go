@@ -11,12 +11,17 @@ import (
 )
 
 const (
-	LanguageTableName = "languages"
+	// LanguageTableName = "languages"
 
 	LanguageColumnID         = "id"
 	LanguageColumnName       = "name"
 	LanguageColumnWordsCount = "words_count"
 )
+
+func FirstLanguage(db *sql.DB) (l *Language, err error)    { return }
+func FirstLanguages(db *sql.DB) (l []*Language, err error) { return }
+func LastLanguage(db *sql.DB) (l *Language, err error)     { return }
+func LastLanguages(db *sql.DB) (l []*Language, err error)  { return }
 
 func FindLanguage(db *sql.DB, opts ...go2sql.QueryOption) (l *Language, err error) {
 	l = &Language{}

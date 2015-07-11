@@ -1,22 +1,47 @@
 package model
 
-import "time"
+import (
+	"html/template"
+	"time"
+
+	"bitbucket.org/pkg/inflect"
+)
+
+const (
+	LanguageTableName = "languages"
+)
+
+type MyString string
 
 type Language struct {
-	ID         uint `sqlgen:"auto,primary-key"`
+	ID         uint `go2sql:",id,primary-key"`
 	Name       string
-	WordsCount uint
+	WordsCount uint `go2sql:"word_stat"`
 
-	Ignored string `sqlgen:"-"`
+	// WordsCount *uint
+	// HTML template.HTML
+
+	Ignored string `go2sql:"-"`
 
 	// Info
-	// Origin Origin `sqlgen:"inline"`
+	// Origin Origin `go2sql:",inline"`
+	// Name Type     `go2sql:"name2"`
 
-	AuthorID uint
+	AuthorID **uint
 	Author   Person
+
+	Embed struct {
+		Name string
+	}
+
+	MyString MyString
+
+	Rule inflect.Rule
 
 	// TODO: support array
 	Keywords []*Keyword
+
+	HTML template.HTML
 
 	Teachers []Teacher
 	// LanguagesTeachers []LanguageTeacher
@@ -28,7 +53,7 @@ type Info struct {
 }
 
 type Keyword struct {
-	ID   uint `sqlgen:"auto,primary-key"`
+	ID   uint `go2sql:",id,primary-key"`
 	Name string
 	Type string
 
@@ -36,7 +61,7 @@ type Keyword struct {
 }
 
 type Person struct {
-	ID    uint `sqlgen:"auto,primary-key"`
+	ID    uint `go2sql:",id,primary-key"`
 	Name  string
 	Email string
 
@@ -45,7 +70,7 @@ type Person struct {
 }
 
 type Teacher struct {
-	ID   uint `sqlgen:"auto,primary-key"`
+	ID   uint `go2sql:",id,primary-key"`
 	Name string
 	Age  uint
 }

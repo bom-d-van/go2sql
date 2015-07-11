@@ -1,11 +1,19 @@
 package go2sql
 
 type (
-	InsertOption interface{}
-	DeleteOption interface{}
-	UpdateOption interface{}
+	InsertOption interface {
+		InsertOption()
+	}
+	DeleteOption interface {
+		DeleteOption()
+	}
+	UpdateOption interface {
+		UpdateOption()
+	}
 
-	QueryOption           interface{}
+	QueryOption interface {
+		QueryOption()
+	}
 	PartialSQLQueryOption SQLQuery
 	FullSQLQueryOption    SQLQuery
 	SelectQueryOption     []string
@@ -17,12 +25,24 @@ type (
 )
 
 var (
-	InsertOptionDeep InsertOption = true
+	InsertOptionDeep InsertOption = insertOption{}
 
-	DeleteOptionDeep DeleteOption = true
+	DeleteOptionDeep DeleteOption = deleteOption{}
 
-	UpdateOptionDeep UpdateOption = true
+	UpdateOptionDeep UpdateOption = updateOption{}
 )
+
+func (PartialSQLQueryOption) QueryOption() {}
+func (FullSQLQueryOption) QueryOption()    {}
+func (SelectQueryOption) QueryOption()     {}
+
+type insertOption struct{}
+type deleteOption struct{}
+type updateOption struct{}
+
+func (insertOption) InsertOption() {}
+func (deleteOption) DeleteOption() {}
+func (updateOption) UpdateOption() {}
 
 func HasInsertOption(opts []InsertOption, opt InsertOption) bool {
 	for _, o := range opts {
