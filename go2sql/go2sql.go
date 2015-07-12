@@ -10,41 +10,58 @@ type (
 	UpdateOption interface {
 		UpdateOption()
 	}
-
 	QueryOption interface {
 		QueryOption()
 	}
-	PartialSQLQueryOption SQLQuery
-	FullSQLQueryOption    SQLQuery
-	SelectQueryOption     []string
 
-	SQLQuery struct {
-		Query string
-		Args  []interface{}
+	Selects []string
+
+	Tables []Table
+	Table  struct {
+		Name   string
+		Tables Tables
+	}
+
+	SQL struct {
+		SQL  string
+		Args []interface{}
+		Full bool
 	}
 )
 
-var (
-	InsertOptionDeep InsertOption = insertOption{}
+// var (
+// 	// QueryOptionDeep  QueryOption  = queryOption{}
+// 	InsertOptionDeep InsertOption = insertOption{}
+// 	DeleteOptionDeep DeleteOption = deleteOption{}
+// 	UpdateOptionDeep UpdateOption = updateOption{}
+// )
 
-	DeleteOptionDeep DeleteOption = deleteOption{}
+func (Selects) QueryOption() {}
 
-	UpdateOptionDeep UpdateOption = updateOption{}
-)
+// type insertOption struct{}
+// type deleteOption struct{}
+// type updateOption struct{}
 
-func (PartialSQLQueryOption) QueryOption() {}
-func (FullSQLQueryOption) QueryOption()    {}
-func (SelectQueryOption) QueryOption()     {}
+// func (insertOption) InsertOption() {}
+// func (deleteOption) DeleteOption() {}
+// func (updateOption) UpdateOption() {}
 
-type insertOption struct{}
-type deleteOption struct{}
-type updateOption struct{}
+func (Tables) InsertOption() {}
+func (Tables) DeleteOption() {}
+func (Tables) UpdateOption() {}
+func (Tables) QueryOption()  {}
 
-func (insertOption) InsertOption() {}
-func (deleteOption) DeleteOption() {}
-func (updateOption) UpdateOption() {}
+func (SQL) InsertOption() {}
+func (SQL) DeleteOption() {}
+func (SQL) UpdateOption() {}
+func (SQL) QueryOption()  {}
 
-func HasInsertOption(opts []InsertOption, opt InsertOption) bool {
+type InsertOptions []InsertOption
+type DeleteOptions []DeleteOption
+type UpdateOptions []UpdateOption
+type QueryOptions []QueryOption
+
+func (opts InsertOptions) HasOption(opt InsertOption) bool {
 	for _, o := range opts {
 		if o == opt {
 			return true
@@ -53,7 +70,7 @@ func HasInsertOption(opts []InsertOption, opt InsertOption) bool {
 	return false
 }
 
-func HasDeleteOption(opts []DeleteOption, opt DeleteOption) bool {
+func (opts DeleteOptions) HasOption(opt DeleteOption) bool {
 	for _, o := range opts {
 		if o == opt {
 			return true
@@ -62,7 +79,7 @@ func HasDeleteOption(opts []DeleteOption, opt DeleteOption) bool {
 	return false
 }
 
-func HasUpdateOption(opts []UpdateOption, opt UpdateOption) bool {
+func (opts UpdateOptions) HasOption(opt UpdateOption) bool {
 	for _, o := range opts {
 		if o == opt {
 			return true
@@ -71,27 +88,90 @@ func HasUpdateOption(opts []UpdateOption, opt UpdateOption) bool {
 	return false
 }
 
-func GetPartialSQLQueryOption(opts []QueryOption) (sql PartialSQLQueryOption, ok bool) {
+func (opts QueryOptions) HasOption(opt QueryOption) bool {
 	for _, o := range opts {
-		if sql, ok = o.(PartialSQLQueryOption); ok {
-			break
+		if o == opt {
+			return true
+		}
+	}
+	return false
+}
+
+func (opts InsertOptions) GetTables() (ts Tables, ok bool) {
+	for _, o := range opts {
+		if ts, ok = o.(Tables); ok {
+			return
 		}
 	}
 	return
 }
 
-func GetFullSQLQueryOption(opts []QueryOption) (sql FullSQLQueryOption, ok bool) {
+func (opts DeleteOptions) GetTables() (ts Tables, ok bool) {
 	for _, o := range opts {
-		if sql, ok = o.(FullSQLQueryOption); ok {
-			break
+		if ts, ok = o.(Tables); ok {
+			return
 		}
 	}
 	return
 }
 
-func GetSelectQueryOption(opts []QueryOption) (sel SelectQueryOption, ok bool) {
+func (opts UpdateOptions) GetUpdateTables() (ts Tables, ok bool) {
 	for _, o := range opts {
-		if sel, ok = o.(SelectQueryOption); ok {
+		if ts, ok = o.(Tables); ok {
+			return
+		}
+	}
+	return
+}
+
+func (opts QueryOptions) GetTables() (ts Tables, ok bool) {
+	for _, o := range opts {
+		if ts, ok = o.(Tables); ok {
+			return
+		}
+	}
+	return
+}
+
+func (opts InsertOptions) GetSQL() (sql SQL, ok bool) {
+	for _, o := range opts {
+		if sql, ok = o.(SQL); ok {
+			return
+		}
+	}
+	return
+}
+
+func (opts DeleteOptions) GetSQL() (sql SQL, ok bool) {
+	for _, o := range opts {
+		if sql, ok = o.(SQL); ok {
+			return
+		}
+	}
+	return
+}
+
+func (opts UpdateOptions) GetUpdateSQL() (sql SQL, ok bool) {
+	for _, o := range opts {
+		if sql, ok = o.(SQL); ok {
+			return
+		}
+	}
+	return
+}
+
+func (opts QueryOptions) GetSQL() (sql SQL, ok bool) {
+	for _, o := range opts {
+		if sql, ok = o.(SQL); ok {
+			return
+		}
+	}
+	return
+}
+
+func (opts QueryOptions) GetSelect() (sel Selects, ok bool) {
+	for _, o := range opts {
+		if sel, ok = o.(Selects); ok {
 			break
 		}
 	}
