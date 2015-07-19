@@ -6,7 +6,15 @@ import (
 	"database/sql"
 )
 
-func (k *Keyword) Insert(db *sql.DB) (r sql.Result, err error) {
+type Keywords []*Keyword
+
+func (t *Keywords) IsEmptyRow() (is bool)                           { return }
+func (t *Keywords) IsNewRow() (is bool)                             { return }
+func (t *Keywords) Insert(optsx ...go2sql.InsertOption) (err error) { return }
+func (t *Keywords) Update(optsx ...go2sql.UpdateOption) (err error) { return }
+func (t *Keywords) Delete(optsx ...go2sql.DeleteOption) (err error) { return }
+
+func (k *Keyword) Insert(optsx ...go2sql.InsertOption) (r sql.Result, err error) {
 	// re, err := db.Exec(`INSERT INTO keywords (name, type, language_id) VALUES(?, ?, ?)`, k.Name, k.Type, l.ID)
 	// if err != nil {
 	// 	return r, err
@@ -20,11 +28,11 @@ func (k *Keyword) Insert(db *sql.DB) (r sql.Result, err error) {
 	return
 }
 
-func FindKeywords(db *sql.DB, opts ...go2sql.QueryOption) (k []*Keyword, err error) {
+func FindKeywords(opts ...go2sql.QueryOption) (k []*Keyword, err error) {
 	return
 }
 
-func FindKeyword(db *sql.DB, opts ...go2sql.QueryOption) (k *Keyword, err error) {
+func FindKeyword(opts ...go2sql.QueryOption) (k *Keyword, err error) {
 	// rows, err := db.Query(`select id, name, type, language_id from keywords where language_id = ?`, l.ID)
 	// if err != nil {
 	// 	return
