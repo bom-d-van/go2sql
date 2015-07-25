@@ -45,6 +45,9 @@ func resetDB() {
 			PRIMARY KEY (id)
 		);
 	`))
+}
+
+func populateDB() {
 	rand.Seed(time.Now().UnixNano())
 	for i := 1; i < 100; i++ {
 		must(db.Exec(fmt.Sprintf("INSERT INTO languages (name, words_stat) VALUES ('Mr. Tester', %d);", i)))
@@ -59,6 +62,7 @@ func must(r sql.Result, err error) {
 
 func TestFindLanguage(t *testing.T) {
 	resetDB()
+	populateDB()
 
 	var l *Language
 	var err error
@@ -111,6 +115,7 @@ func TestFindLanguage(t *testing.T) {
 
 func TestFindLanguages(t *testing.T) {
 	resetDB()
+	populateDB()
 
 	var ls Languages
 	var err error
@@ -170,5 +175,22 @@ func TestFindLanguages(t *testing.T) {
 func TestInsertLanguage(t *testing.T) {
 	resetDB()
 
-	var Language Language
+	l := &Language{}
+	l.Name = "Miss Tester"
+	l.WordsCount = 97
+	err := l.Insert()
+	if err != nil {
+		t.Error(err)
+	}
+
+	l, err = FindLanguage()
+	if err != nil {
+		t.Error(err)
+	}
+	if got, want := l.Name, "Miss Tester"; got != want {
+		t.Errorf("l.Name = %s; want %s", got, want)
+	}
+	if got, want := l.WordsCount, uint(97); got != want {
+		t.Errorf("l.Name = %d; want %d", got, want)
+	}
 }

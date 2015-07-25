@@ -20,8 +20,9 @@ type (
 
 	Tables []Table
 	Table  struct {
-		Name   string
-		Tables Tables
+		Name    string
+		Tables  Tables
+		Columns []string // TODO
 	}
 
 	SQL struct {

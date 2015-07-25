@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -223,11 +224,109 @@ func (l *Language) IsNewRow() bool {
 // 	FindLanguage(go2sql.DB(db), go2sql.NewSQL("limit 1 ordered by id dsc"))
 // }
 
-func (l *Languages) Duplicate(optsx ...go2sql.InsertOption) (nl *Language, err error) {
+func (l *Language) Duplicate(optsx ...go2sql.InsertOption) (nl *Language, err error) {
 	return
 }
 
-func (l *Languages) ZeroPrimaryKeys() {
+func (l *Language) ZeroPrimaryKeys() {
+}
+
+func (ls *Languages) Insert(optsx ...go2sql.InsertOption) (err error) {
+	if len(*ls) == 0 {
+		return
+	}
+
+	opts := go2sql.InsertOptions(optsx)
+	db, ok := opts.GetDB()
+	if !ok {
+		db = go2sql.DefaultDB.DB
+	}
+	if db == nil {
+		err = errors.New("should specify *sql.DB by go2sql.DB or init go2sql.DefaultDB")
+		return
+	}
+
+	tables, _ := opts.GetTables()
+
+	for _, table := range tables {
+		switch table.Name {
+		case LanguageColumnAuthor:
+			var authors People
+			for _, l := range ls {
+				if l.Author != nil {
+					authors = append(authors, l.Author)
+				}
+			}
+			if err = authors.Insert(); err != nil {
+				return
+			}
+		default:
+			err = fmt.Errorf("go2sql: unknown table %s", table)
+			return
+		}
+	}
+
+	// TODO: support selects
+	stmt, err := db.Prepare(`INSERT INTO languages (name, words_stat) VALUES(?, ?)`)
+	if err != nil {
+		return
+	}
+	defer func() {
+		er := stmt.Close()
+		if err == nil {
+			err = er
+		} else {
+			log.Println(er)
+		}
+	}()
+	for _, l := range ls {
+		var r sql.Result
+		r, err = stmt.Exec(l.Name, l.WordsCount)
+		if err != nil {
+			return
+		}
+		id, err := r.LastInsertId()
+		if err != nil {
+			return
+		}
+		l.ID = uint(id)
+	}
+
+	for _, table := range tables {
+		switch table.Name {
+		case LanguageColumnKeywords:
+			for index := range l.Keywords {
+				l.Keywords[index].LanguageID = l.ID
+				// if err := l.Keywords[index].Update(db); err != nil {
+				// 	return
+				// }
+			}
+			keywords := Keywords(l.Keywords)
+			if err = keywords.Update(go2sql.DB(db), table.Tables); err != nil {
+				return
+			}
+		case LanguageColumnTeachers:
+			teachers := Teachers(l.Teachers)
+			if err = teachers.Update(go2sql.DB(db), table.Tables); err != nil {
+				return
+			}
+			for index := range l.Teachers {
+				// if l.Teachers[index].ID <= 0 {
+				// 	if _, err = l.Teachers[index].Insert(db); err != nil {
+				// 		return
+				// 	}
+				// }
+				if _, err = db.Exec("INSERT INTO languages_teachers_xref (language_id, teacher_id) VALUES (?, ?)", l.ID, l.Teachers[index].ID); err != nil {
+					return
+				}
+			}
+		default:
+			err = fmt.Errorf("go2sql: unknown column %s", table)
+			return
+		}
+	}
+
+	return
 }
 
 func (l *Language) Insert(optsx ...go2sql.InsertOption) (err error) {
@@ -263,7 +362,8 @@ func (l *Language) Insert(optsx ...go2sql.InsertOption) (err error) {
 		}
 	}
 
-	r, err := db.Exec(`INSERT INTO languages (name, words_stat, author_id) VALUES(?, ?, ?)`, l.Name, l.WordsCount, l.AuthorID)
+	// TODO: support selects
+	r, err := db.Exec(`INSERT INTO languages (name, words_stat) VALUES(?, ?)`, l.Name, l.WordsCount)
 	if err != nil {
 		return
 	}
@@ -306,34 +406,6 @@ func (l *Language) Insert(optsx ...go2sql.InsertOption) (err error) {
 			return
 		}
 	}
-	// if len(l.Keywords) > 0 && tables {
-	// 	for i, k := range l.Keywords {
-	// 		l.Keywords[i].LanguageID = l.ID
-	// 		if err := l.Keywords[i].Update(db); err != nil {
-	// 			return
-	// 		}
-	// 		// if !k.IsNewRow() {
-	// 		// 	if r, err = db.Exec("UPDATE keywords SET language_id = ? WHERE id = ?", l.ID, k.ID); err != nil {
-	// 		// 		return
-	// 		// 	}
-	// 		// } else if _, err = l.Keywords[i].Insert(db); err != nil {
-	// 		// 	return
-	// 		// }
-	// 	}
-	// }
-
-	// if len(l.Teachers) > 0 && go2sql.HasInsertOption(opts, go2sql.InsertOptionDeep) {
-	// 	for i, t := range l.Teachers {
-	// 		if t.ID <= 0 {
-	// 			if _, err = l.Teachers[i].Insert(db); err != nil {
-	// 				return
-	// 			}
-	// 		}
-	// 		if _, err = db.Exec("INSERT INTO languages_teachers_xref (language_id, teacher_id) VALUES (?, ?)", l.ID, l.Teachers[i].ID); err != nil {
-	// 			return
-	// 		}
-	// 	}
-	// }
 
 	return
 }
