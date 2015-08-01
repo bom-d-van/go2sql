@@ -252,7 +252,7 @@ func (ls *Languages) Insert(optsx ...go2sql.InsertOption) (err error) {
 		switch table.Name {
 		case LanguageColumnAuthor:
 			var authors People
-			for _, l := range ls {
+			for _, l := range *ls {
 				if l.Author != nil {
 					authors = append(authors, l.Author)
 				}
@@ -279,13 +279,14 @@ func (ls *Languages) Insert(optsx ...go2sql.InsertOption) (err error) {
 			log.Println(er)
 		}
 	}()
-	for _, l := range ls {
+	for _, l := range *ls {
 		var r sql.Result
 		r, err = stmt.Exec(l.Name, l.WordsCount)
 		if err != nil {
 			return
 		}
-		id, err := r.LastInsertId()
+		var id int64
+		id, err = r.LastInsertId()
 		if err != nil {
 			return
 		}
@@ -295,31 +296,41 @@ func (ls *Languages) Insert(optsx ...go2sql.InsertOption) (err error) {
 	for _, table := range tables {
 		switch table.Name {
 		case LanguageColumnKeywords:
-			for index := range l.Keywords {
-				l.Keywords[index].LanguageID = l.ID
-				// if err := l.Keywords[index].Update(db); err != nil {
-				// 	return
-				// }
+			var keywords Keywords
+			for _, l := range *ls {
+				for _, keyword := range l.Keywords {
+					keyword.LanguageID = l.ID
+					keywords = append(keywords, keyword)
+				}
 			}
-			keywords := Keywords(l.Keywords)
 			if err = keywords.Update(go2sql.DB(db), table.Tables); err != nil {
 				return
 			}
 		case LanguageColumnTeachers:
-			teachers := Teachers(l.Teachers)
+			var teachers Teachers
+			for _, l := range *ls {
+				for _, teacher := range l.Teachers {
+					teacher.LanguageID = l.ID
+					teachers = append(teachers, teacher)
+				}
+			}
 			if err = teachers.Update(go2sql.DB(db), table.Tables); err != nil {
 				return
 			}
-			for index := range l.Teachers {
-				// if l.Teachers[index].ID <= 0 {
-				// 	if _, err = l.Teachers[index].Insert(db); err != nil {
-				// 		return
-				// 	}
-				// }
-				if _, err = db.Exec("INSERT INTO languages_teachers_xref (language_id, teacher_id) VALUES (?, ?)", l.ID, l.Teachers[index].ID); err != nil {
+			for _, teacher := range teachers {
+				if _, err = db.Exec("INSERT INTO languages_teachers_xref (language_id, teacher_id) VALUES (?, ?)", teacher.LanguageID, teacher.ID); err != nil {
 					return
 				}
 			}
+			// teachers := Teachers(l.Teachers)
+			// if err = teachers.Update(go2sql.DB(db), table.Tables); err != nil {
+			// 	return
+			// }
+			// for index := range l.Teachers {
+			// 	if _, err = db.Exec("INSERT INTO languages_teachers_xref (language_id, teacher_id) VALUES (?, ?)", l.ID, l.Teachers[index].ID); err != nil {
+			// 		return
+			// 	}
+			// }
 		default:
 			err = fmt.Errorf("go2sql: unknown column %s", table)
 			return
@@ -410,14 +421,11 @@ func (l *Language) Insert(optsx ...go2sql.InsertOption) (err error) {
 	return
 }
 
-// TODO: deep update
 func (l *Language) Update(optsx ...go2sql.UpdateOption) (err error) {
-	// if !l.Author.IsEmptyRow() && go2sql.HasUpdateOption(opts, go2sql.UpdateOptionDeep) {
-	// 	if _, err = l.Author.Update(db); err != nil {
-	// 		return
-	// 	}
-	// 	l.AuthorID = l.Author.ID
-	// }
+	if l == nil {
+		return
+	}
+
 	opts := go2sql.UpdateOptions(optsx)
 	db, ok := opts.GetDB()
 	if !ok {
@@ -470,32 +478,77 @@ func (l *Language) Update(optsx ...go2sql.UpdateOption) (err error) {
 			if err = teachers.Update(go2sql.DB(db), table.Tables); err != nil {
 				return
 			}
-			// for index := range l.Teachers {
-			// 	if _, err = db.Exec("INSERT INTO languages_teachers_xref (language_id, teacher_id) VALUES (?, ?)", l.ID, l.Teachers[index].ID); err != nil {
-			// 		return
-			// 	}
-			// }
 		default:
 			err = fmt.Errorf("go2sql: unknown column %s", table)
 			return
 		}
 	}
 
-	// if len(l.Keywords) > 0 && go2sql.HasUpdateOption(opts, go2sql.UpdateOptionDeep) {
-	// 	for i := range l.Keywords {
-	// 		if _, err = l.Keywords[i].Update(db); err != nil {
-	// 			return
-	// 		}
-	// 	}
-	// }
+	return
+}
 
-	// if len(l.Teachers) > 0 && go2sql.HasUpdateOption(opts, go2sql.UpdateOptionDeep) {
-	// 	for i := range l.Teachers {
-	// 		if _, err = l.Teachers[i].Update(db); err != nil {
-	// 			return
-	// 		}
-	// 	}
-	// }
+func (ls *Languages) Update(optsx ...go2sql.UpdateOption) (err error) {
+	if l == nil {
+		return
+	}
+
+	opts := go2sql.UpdateOptions(optsx)
+	db, ok := opts.GetDB()
+	if !ok {
+		db = go2sql.DefaultDB.DB
+	}
+	if db == nil {
+		err = errors.New("should specify *sql.DB by go2sql.DB or init go2sql.DefaultDB")
+		return
+	}
+
+	tables, _ := opts.GetTables()
+
+	for _, table := range tables {
+		switch table.Name {
+		case LanguageColumnAuthor:
+			if l.Author.IsNewRow() {
+				continue
+			}
+			if err = l.Author.Update(go2sql.DB(db), table.Tables); err != nil {
+				return
+			}
+			l.AuthorID = l.Author.ID
+		default:
+			err = fmt.Errorf("go2sql: unknown column %s", table)
+			return
+		}
+	}
+
+	if l.IsNewRow() {
+		err = l.Insert(go2sql.DB(db))
+	} else {
+		_, err = db.Exec(`UPDATE languages SET name = ?, words_stat = ? WHERE id = ?`, l.Name, l.WordsCount, l.ID)
+	}
+	if err != nil {
+		return
+	}
+
+	for _, table := range tables {
+		switch table.Name {
+		case LanguageColumnKeywords:
+			for index := range l.Keywords {
+				l.Keywords[index].LanguageID = l.ID
+			}
+			keywords := Keywords(l.Keywords)
+			if err = keywords.Update(go2sql.DB(db), table.Tables); err != nil {
+				return
+			}
+		case LanguageColumnTeachers:
+			teachers := Teachers(l.Teachers)
+			if err = teachers.Update(go2sql.DB(db), table.Tables); err != nil {
+				return
+			}
+		default:
+			err = fmt.Errorf("go2sql: unknown column %s", table)
+			return
+		}
+	}
 
 	return
 }
@@ -544,7 +597,6 @@ func (l *Language) UpdateColumns(optsx ...go2sql.UpdateOption) (err error) {
 	return
 }
 
-// TODO: deep delete
 func (l *Language) Delete(optsx ...go2sql.DeleteOption) (err error) {
 	if l == nil || l.IsEmptyRow() {
 		return
@@ -560,37 +612,21 @@ func (l *Language) Delete(optsx ...go2sql.DeleteOption) (err error) {
 		return
 	}
 
-	// if go2sql.HasDeleteOption(opts, go2sql.DeleteOptionDeep) {
-	// }
-
-	// if len(l.Keywords) > 0 {
-	// 	for i := range l.Keywords {
-	// 		if _, err = l.Keywords[i].Delete(db); err != nil {
-	// 			return
-	// 		}
-	// 	}
-	// }
-
-	// if len(l.Teachers) > 0 {
-	// 	for i := range l.Teachers {
-	// 		if _, err = l.Teachers[i].Delete(db); err != nil {
-	// 			return
-	// 		}
-	// 	}
-	// }
-
+	_, err = db.Exec(`DELETE FROM languages WHERE id = ?`, l.ID)
+	if err != nil {
+		return
+	}
 	tables, _ := opts.GetTables()
-
 	for _, table := range tables {
 		switch table.Name {
 		case LanguageColumnAuthor:
-			err = l.Author.Delete(go2sql.DB(db))
+			err = l.Author.Delete(go2sql.DB(db), table.Tables)
 		case LanguageColumnKeywords:
 			keywords := Keywords(l.Keywords)
-			err = keywords.Delete(go2sql.DB(db))
+			err = keywords.Delete(go2sql.DB(db), table.Tables)
 		case LanguageColumnTeachers:
 			teachers := Teachers(l.Teachers)
-			err = teachers.Delete(go2sql.DB(db))
+			err = teachers.Delete(go2sql.DB(db), table.Tables)
 		default:
 			err = fmt.Errorf("go2sql: unknown column %s", table)
 		}
@@ -599,7 +635,58 @@ func (l *Language) Delete(optsx ...go2sql.DeleteOption) (err error) {
 		}
 	}
 
-	_, err = db.Exec(`DELETE FROM languages WHERE id = ?`, l.ID)
+	return
+}
+
+func (ls *Languages) Delete(optsx ...go2sql.DeleteOption) (err error) {
+	opts := go2sql.DeleteOptions(optsx)
+	db, ok := opts.GetDB()
+	if !ok {
+		db = go2sql.DefaultDB.DB
+	}
+	if db == nil {
+		err = errors.New("should specify *sql.DB by go2sql.DB or init go2sql.DefaultDB")
+		return
+	}
+
+	var ids []interface{}
+	var idsCons []string
+	for _, l := range *ls {
+		ids = append(ids, l.ID)
+		idsCons = append(idsCons, "id = ?")
+	}
+	_, err = db.Exec(`DELETE FROM languages WHERE `+strings.Join(idsCons, " or "), ids...)
+	if err != nil {
+		return
+	}
+	tables, _ := opts.GetTables()
+	for _, table := range tables {
+		switch table.Name {
+		case LanguageColumnAuthor:
+			var people People
+			for _, l := range *ls {
+				people = append(people, l.Author)
+			}
+			err = people.Delete(go2sql.DB(db))
+		case LanguageColumnKeywords:
+			var keywords Keywords
+			for _, l := range *ls {
+				keywords = append(keywords, l.Keywords...)
+			}
+			err = keywords.Delete(go2sql.DB(db))
+		case LanguageColumnTeachers:
+			var teachers Teachers
+			for _, l := range *ls {
+				teachers = append(teachers, l.Teachers...)
+			}
+			err = teachers.Delete(go2sql.DB(db))
+		default:
+			err = fmt.Errorf("go2sql: unknown column %s", table)
+		}
+		if err != nil {
+			return
+		}
+	}
 
 	return
 }

@@ -31,3 +31,7 @@ func toSnake(str string) string {
 func isUpper(l rune) bool {
 	return rune('A') <= l && l <= rune('Z')
 }
+
+func camelCase(str string) string {
+	return strings.ToLower(str[:1]) + str[1:]
+}
